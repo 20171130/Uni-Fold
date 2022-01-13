@@ -1,4 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DP Technology
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """Run Uni-Fold with preprocessed protein features (features.pkl)."""
-
 import glob
 import os
 import pickle
@@ -42,8 +41,8 @@ flags.DEFINE_list(
     'model name should correspond to a model configuration in '
     '`unifold/model/config.py`')
 flags.DEFINE_list(
-    'model_paths', None, 'Paths of saved models, separated by commas. Must '
-    'be in *.npz format.')
+    'model_paths', None, 'Paths of saved models, separated by commas. In '
+    '*.npy or *.pkl formats.')
 flags.DEFINE_string(
     'output_dir', None, 'Path to a directory that will store the results.')
 flags.DEFINE_string(
@@ -68,7 +67,7 @@ flags.DEFINE_bool(
 FLAGS = flags.FLAGS
 
 # Configurations for the AmberRelaxer.
-# Uni-Fold used the same setups as AlphaFold2.
+# Uni-Fold used the same setup as AlphaFold2.
 RELAX_MAX_ITERATIONS = 0
 RELAX_ENERGY_TOLERANCE = 2.39
 RELAX_STIFFNESS = 10.0

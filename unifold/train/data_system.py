@@ -1,19 +1,3 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Data system used to load training datasets."""
-
 from absl import logging
 import glob
 import jax
@@ -121,10 +105,10 @@ class DataSystem:
       self,
       rng,
       batch_size = None):
-    """
+    '''
     pick a (batch of) protein(s) randomly and generate rng(s) for processing.
     if batch_size is None, return a pair of result; otherwise return a list of pairs.
-    """
+    '''
     rng, seed = utils.split_np_random_seed(rng)
     np.random.seed(seed)
     if batch_size is None:
@@ -157,10 +141,10 @@ class DataSystem:
       self,
       step,
       batch):
-    """
+    '''
     generate the number of recycling iterations for a given step and add it to the batch.
     this method is specifically set here to make sure the result is equal among workers at each step.
-    """
+    '''
     rng = jrand.PRNGKey(step)
     num_iter_recycling = jrand.randint(rng, [1], 0, self.mc.model.num_recycle + 1)
     batch['num_iter_recycling'] = num_iter_recycling
@@ -206,12 +190,12 @@ class DataSystem:
 
 
 class GetBatchProcess(Process):
-  """
+  '''
   a multiprocessing worker to conduct data loading.
   remark: make sure no jax call is used before this worker starts,
           or the XLA-in-fork issue could arise. (notably, there are 
           tensorflow calls in `DataSystem.preprocess()`. )
-  """
+  '''
   def __init__(
       self,
       queue: Queue,
@@ -229,6 +213,9 @@ class GetBatchProcess(Process):
     self.mpi_rank = mpi_rank
 
   def run(self):
+    os.environ['HIP_VISIBLE_DEVICES']=""
+    os.environ['ROCR_VISIBLE_DEVICES']=""
+    os.environ['CUDA_VISIBLE_DEVICES']=""
     with jax.disable_jit():
       rng = jrand.PRNGKey(self.random_seed)
       rng = jrand.fold_in(rng, self.mpi_rank)
@@ -239,5 +226,5 @@ class GetBatchProcess(Process):
         batch = self.data.random_recycling(step, batch)
       self.queue.put((batch_rng, batch))
       logging.debug(f"write queue item {step}. current qsize = {self.queue.qsize()}.")
-    logging.debug("get batch process finished.")
+    logging.info("get batch process finished.")
     return

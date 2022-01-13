@@ -1,4 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Modules and code used in the core part of Uni-Fold.
+"""Modules and code used in the core part of AlphaFold.
 
 The structure generation code is in 'folding.py'.
 """
@@ -1405,7 +1405,6 @@ def _distogram_log_loss(logits, bin_edges, batch, num_bins):
   assert len(logits.shape) == 3
   positions = batch['pseudo_beta']
   mask = batch['pseudo_beta_mask']
-
   assert positions.shape[-1] == 3
 
   sq_breaks = jnp.square(bin_edges)
@@ -1418,9 +1417,8 @@ def _distogram_log_loss(logits, bin_edges, batch, num_bins):
       keepdims=True)
 
   true_bins = jnp.sum(dist2 > sq_breaks, axis=-1)
-
-  errors = softmax_cross_entropy(
-      labels=jax.nn.one_hot(true_bins, num_bins), logits=logits)
+  labels = jax.nn.one_hot(true_bins, num_bins)
+  errors = softmax_cross_entropy(labels=labels, logits=logits)
 
   square_mask = jnp.expand_dims(mask, axis=-2) * jnp.expand_dims(mask, axis=-1)
 
@@ -1849,12 +1847,7 @@ class EmbeddingsAndEvoformer(hk.Module):
 
       # Embed the templates aatype, torsion angles and masks.
       # Shape (templates, residues, msa_channels)
-      ret = all_atom.atom37_to_torsion_angles(
-          aatype=batch['template_aatype'],
-          all_atom_pos=batch['template_all_atom_positions'],
-          all_atom_mask=batch['template_all_atom_masks'],
-          # Ensure consistent behaviour during testing:
-          placeholder_for_undefined=not gc.zero_init)
+      ret = batch
 
       template_features = jnp.concatenate([
           aatype_one_hot,
@@ -1975,17 +1968,8 @@ class SingleTemplateEmbedding(hk.Module):
     to_concat.append(jnp.tile(aatype[:, None, :], [1, num_res, 1]))
 
     n, ca, c = [residue_constants.atom_order[a] for a in ('N', 'CA', 'C')]
-    rot, trans = quat_affine.make_transform_from_reference(
-        n_xyz=batch['template_all_atom_positions'][:, n],
-        ca_xyz=batch['template_all_atom_positions'][:, ca],
-        c_xyz=batch['template_all_atom_positions'][:, c])
-    affines = quat_affine.QuatAffine(
-        quaternion=quat_affine.rot_to_quat(rot, unstack_inputs=True),
-        translation=trans,
-        rotation=rot,
-        unstack_inputs=True)
-    points = [jnp.expand_dims(x, axis=-2) for x in affines.translation]
-    affine_vec = affines.invert_point(points, extra_dims=1)
+    translation = batch['template_point']
+    affine_vec = batch['template_affine_vec']
     inv_distance_scalar = jax.lax.rsqrt(
         1e-6 + sum([jnp.square(x.astype(jnp.float32)) for x in affine_vec]))
     inv_distance_scalar = inv_distance_scalar.astype(dtype)
@@ -2057,7 +2041,6 @@ class TemplateEmbedding(hk.Module):
     Returns:
       A template embedding [N_res, N_res, c_z].
     """
-
     num_templates = template_batch['template_mask'].shape[0]
     num_channels = (self.config.template_pair_stack
                     .triangle_attention_ending_node.value_dim)
@@ -2073,7 +2056,6 @@ class TemplateEmbedding(hk.Module):
     # embedder here.
     # Jumper et al. (2021) Suppl. Alg. 2 "Inference" lines 9-12
     template_embedder = SingleTemplateEmbedding(self.config, self.global_config)
-
     def map_fn(batch):
       return template_embedder(query_embedding, batch, mask_2d, is_training)
 
@@ -2109,5 +2091,4 @@ class TemplateEmbedding(hk.Module):
 
     # No gradients if no templates.
     embedding *= (jnp.sum(template_mask) > 0.).astype(embedding.dtype)
-
     return embedding

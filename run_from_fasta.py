@@ -1,4 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """Full Uni-Fold protein structure prediction script."""
-
 import glob
 import json
 import numpy as np
@@ -47,7 +46,7 @@ from unifold.relax.relax import AmberRelaxation
 #### USER CONFIGURATION ####
 
 # Note: If your databases and toolkits were configured directly using the scripts 
-# provided by Uni-Fold, the following code is directly useful. If not, you need 
+# provided by AlphaFold, the following code is directly useful. If not, you need 
 # to customize your own paths of the downloaded databases and toolkits. 
 # See README.md for more details.
 
@@ -100,8 +99,8 @@ flags.DEFINE_list(
     'model name should correspond to a model configuration in '
     '`unifold/model/config.py`')
 flags.DEFINE_list(
-    'model_paths', None, 'Paths of saved models, separated by commas. Must '
-    'be in *.npz format.')
+    'model_paths', None, 'Paths of saved models, separated by commas. In '
+    '*.npy or *.pkl formats.')
 flags.DEFINE_string(
     'output_dir', None, 'Path to a directory that will store the results.')
 flags.DEFINE_string(

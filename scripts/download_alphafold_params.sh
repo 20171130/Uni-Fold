@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 #
 # Downloads and unzips the AlphaFold parameters.
 #
-# Usage: bash download_alphafold_params.sh /path/to/download/directory
+# Usage: bash download_unifold_params.sh /path/to/download/directory
 set -e
 
 if [[ $# -eq 0 ]]; then
@@ -31,7 +31,7 @@ fi
 
 DOWNLOAD_DIR="$1"
 ROOT_DIR="${DOWNLOAD_DIR}/params"
-SOURCE_URL="https://storage.googleapis.com/alphafold/alphafold_params_2021-07-14.tar"
+SOURCE_URL="https://storage.googleapis.com/unifold/unifold_params_2021-07-14.tar"
 BASENAME=$(basename "${SOURCE_URL}")
 
 mkdir --parents "${ROOT_DIR}"

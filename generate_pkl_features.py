@@ -1,19 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Get preprocessed features (features.pkl) from input fasta files."""
-
 import os
 import pathlib
 import pickle
@@ -34,7 +19,7 @@ from unifold.inference.inference_pipeline import generate_pkl_features_from_fast
 #### USER CONFIGURATION ####
 
 # Note: If your databases and toolkits were configured directly using the scripts 
-# provided by Uni-Fold, the following code is directly useful. If not, you need 
+# provided by AlphaFold, the following code is directly useful. If not, you need 
 # to customize your own paths of the downloaded databases and toolkits. 
 # See README.md for more details.
 
@@ -112,10 +97,10 @@ flags.DEFINE_string('obsolete_pdbs_path', obsolete_pdbs_path,
 flags.DEFINE_integer('random_seed', None,
                      'The random seed for the data pipeline. By default, this '
                      'is randomly generated. Note that even if this is set, '
-                     'Uni-Fold may still not be deterministic, because '
+                     'Alphafold may still not be deterministic, because '
                      'processes like GPU inference are nondeterministic.')
 flags.DEFINE_integer('n_cpu', 4, 'Number of CPUs used in the data pipeline.')
-flags.DEFINE_integer('num_workers', 1, 'Number of parallel workers.')
+flags.DEFINE_integer('num_workers', 16, 'Number of parallel workers.')
 
 FLAGS = flags.FLAGS
 

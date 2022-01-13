@@ -1,4 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,13 @@ import copy
 from typing import List, Mapping, Tuple
 from unifold.model.tf import input_pipeline
 from unifold.model.tf import proteins_dataset
+from unifold.model import all_atom
 import ml_collections
 import numpy as np
 import tensorflow.compat.v1 as tf
+from unifold.common import residue_constants
+from unifold.model import quat_affine
+from jax import numpy as jnp
 
 FeatureDict = Mapping[str, np.ndarray]
 
@@ -98,5 +102,53 @@ def np_example_to_features(np_example: FeatureDict,
 
   with tf.Session(graph=tf_graph) as sess:
     features = sess.run(processed_batch)
+    
+  dic = {k: v for k, v in features.items() if v.dtype != 'O'}
+  if 'template_aatype' in dic:
+    # torsion angles
+    batch = dic
+    rets = []  
+    for i in range(batch['template_aatype'].shape[0]):
+      # for each template
+      ret = all_atom.atom37_to_torsion_angles(
+          aatype=batch['template_aatype'][i],
+          all_atom_pos=batch['template_all_atom_positions'][i],
+          all_atom_mask=batch['template_all_atom_masks'][i],
+          # Ensure consistent behaviour during testing:
+          placeholder_for_undefined=not config.model.global_config.zero_init)
+      rets.append(ret)
+    rets = {k:np.stack([item[k] for item in rets]) for k in rets[0].keys()}
+    dic.update(rets)
+      
+    dic['template_point'] = []
+    dic['template_affine_vec'] = []
+    for i in range(batch['template_all_atom_positions'].shape[0]):
+      # template pair
+      dic['template_point'].append([])
+      dic['template_affine_vec'].append([])
+      for j in range(batch['template_all_atom_positions'].shape[1]):
+        # four templates
+        tmp = batch['template_all_atom_positions'][i,j]
+        n, ca, c = [residue_constants.atom_order[a] for a in ('N', 'CA', 'C')]
+        rot, trans = quat_affine.make_transform_from_reference(
+            n_xyz=tmp[:, n],
+            ca_xyz=tmp[:, ca],
+            c_xyz=tmp[:, c])
+        affines = quat_affine.QuatAffine(
+            quaternion=quat_affine.rot_to_quat(rot, unstack_inputs=True),
+            translation=trans,
+            rotation=rot,
+            unstack_inputs=True)
+        point = jnp.stack([jnp.expand_dims(x, axis=-2) for x in affines.translation])
+        affine_vec = jnp.stack(affines.invert_point(point, extra_dims=1))
+        
+        dic['template_point'][i].append(point)
+        dic['template_affine_vec'][i].append(point)
+      dic['template_point'][i] = jnp.stack(dic['template_point'][i])
+      dic['template_affine_vec'][i] = jnp.stack(dic['template_affine_vec'][i])
+    dic['template_point'] = jnp.stack(dic['template_point'])
+    dic['template_affine_vec'] = jnp.stack(dic['template_affine_vec'])
 
-  return {k: v for k, v in features.items() if v.dtype != 'O'}
+    # shape (2, 4, 3, 1, 64) (2, 4, 3, 64, 64)
+    
+  return dic

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Downloads and unzips the Small BFD database for Uni-Fold.
+# Downloads and unzips the Small BFD database for AlphaFold.
 #
 # Usage: bash download_small_bfd.sh /path/to/download/directory
 set -e
@@ -31,7 +31,7 @@ fi
 
 DOWNLOAD_DIR="$1"
 ROOT_DIR="${DOWNLOAD_DIR}/small_bfd"
-SOURCE_URL="https://storage.googleapis.com/alphafold-databases/reduced_dbs/bfd-first_non_consensus_sequences.fasta.gz"
+SOURCE_URL="https://storage.googleapis.com/unifold-databases/reduced_dbs/bfd-first_non_consensus_sequences.fasta.gz"
 BASENAME=$(basename "${SOURCE_URL}")
 
 mkdir --parents "${ROOT_DIR}"

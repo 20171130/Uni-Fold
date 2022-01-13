@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Downloads and unzips the MGnify database for Uni-Fold.
+# Downloads and unzips the MGnify database for AlphaFold.
 #
 # Usage: bash download_mgnify.sh /path/to/download/directory
 set -e
@@ -33,7 +33,7 @@ DOWNLOAD_DIR="$1"
 ROOT_DIR="${DOWNLOAD_DIR}/mgnify"
 # Mirror of:
 # ftp://ftp.ebi.ac.uk/pub/databases/metagenomics/peptide_database/2018_12/mgy_clusters.fa.gz
-SOURCE_URL="https://storage.googleapis.com/alphafold-databases/casp14_versions/mgy_clusters_2018_12.fa.gz"
+SOURCE_URL="https://storage.googleapis.com/unifold-databases/casp14_versions/mgy_clusters_2018_12.fa.gz"
 BASENAME=$(basename "${SOURCE_URL}")
 
 mkdir --parents "${ROOT_DIR}"

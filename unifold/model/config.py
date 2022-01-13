@@ -1,4 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,27 +52,52 @@ CONFIG_DIFFS = {
     'data.eval.max_msa_clusters': 128,
     'model.embeddings_and_evoformer.template.embed_torsion_angles': True,
     'model.embeddings_and_evoformer.template.enabled': True,
-    'model.heads.experimentally_resolved.weight': 0.0,
-    'model.heads.structure_module.structural_violation_loss_weight': 0.0
+    'model.heads.structure_module.structural_violation_loss_weight': 0.0,
+    'model.heads.experimentally_resolved.weight': 0.0
   },
   # A demo configuration for debugging:
   'demo': {
-    'data.common.max_extra_msa': 128,
+    'data.common.max_extra_msa': 32,
     'data.common.num_recycle': 1,
-    'data.eval.crop_size': 128,
+    'data.eval.crop_size': 64,
     'data.eval.max_msa_cluster': 16,
     'model.embeddings_and_evoformer.evoformer_num_block': 4,
     'model.embeddings_and_evoformer.extra_msa_channel': 16,
-    'model.embeddings_and_evoformer.msa_channel': 128,
-    'model.embeddings_and_evoformer.pair_channel': 64,
-    'model.embeddings_and_evoformer.seq_channel': 192,
+    'model.embeddings_and_evoformer.msa_channel': 32,
+    'model.embeddings_and_evoformer.pair_channel': 16,
+    'model.embeddings_and_evoformer.seq_channel': 48,
     'model.heads.structure_module.num_layer': 2,
-    'model.heads.structure_module.num_channel': 192,
+    'model.heads.structure_module.num_channel': 48,
     'model.heads.structure_module.num_head': 6,
-    'model.heads.predicted_lddt.num_channels': 64,
+    'model.heads.predicted_lddt.num_channels': 16,
     'model.num_recycle': 1,
-    'model.heads.experimentally_resolved.weight': 0.0,
-    'model.heads.structure_module.structural_violation_loss_weight': 0.0
+ #   'data.common.reduce_msa_clusters_by_max_templates': True,
+ #   'data.common.use_templates': True,
+ #   'model.embeddings_and_evoformer.template.embed_torsion_angles': True,
+ #   'model.embeddings_and_evoformer.template.enabled': True
+  },
+  'template': {
+    'data.common.reduce_msa_clusters_by_max_templates': True,
+    'data.common.use_templates': True,
+    'model.embeddings_and_evoformer.template.embed_torsion_angles': True,
+    'model.embeddings_and_evoformer.template.enabled': True,
+    'data.common.max_extra_msa': 32,
+    'data.common.num_recycle': 1,
+    'data.eval.crop_size': 64,
+    'data.eval.max_msa_cluster': 16,
+    'model.embeddings_and_evoformer.evoformer_num_block': 1,
+    'model.embeddings_and_evoformer.extra_msa_channel': 16,
+    'model.embeddings_and_evoformer.msa_channel': 32,
+    'model.embeddings_and_evoformer.pair_channel': 16,
+    'model.embeddings_and_evoformer.seq_channel': 48,
+    'model.heads.structure_module.num_layer': 1,
+    'model.heads.structure_module.num_channel': 48,
+    'model.heads.structure_module.num_head': 6,
+    'model.heads.predicted_lddt.num_channels': 16,
+    'model.num_recycle': 1
+  },
+  # A demo configuration for debugging:
+  'base': {
   },
 
   # Below are configurations of finetuning AlphaFold models, unaltered.

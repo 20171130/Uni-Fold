@@ -1,18 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Container (Trainer) for training Uni-Fold."""
+"""Code for constructing the model."""
 
 # major imports
 from absl import logging
@@ -22,8 +8,8 @@ import jax.numpy as jnp
 import numpy as np
 import os
 import time
-
-
+from functools import partial
+from jax.experimental import host_callback as hcb
 # following packages for mpi communication will be just-in-time imported if use_mpi is True
 # from mpi4py import MPI
 # import mpi4jax
@@ -42,9 +28,9 @@ from unifold.train.mixed_precision import normalize_precision, set_unifold_polic
 
 
 class Trainer:
-  """
+  '''
   main class to train the UniFold model.
-  """
+  '''
   def __init__(
       self,
       global_config: ConfigDict,
@@ -53,7 +39,7 @@ class Trainer:
       **kwargs):
 
     self.gc = global_config
-
+    logging.info(f'trainer on device {jax.devices()}')
     self.precision = normalize_precision(self.gc.precision)
     set_unifold_policy(self.precision)
     
@@ -64,9 +50,14 @@ class Trainer:
           is_training=True,
           compute_loss=True,
           ensemble_representations=False)
-
-    self._init_fn = jax.jit(hk.transform(_forward_fn).init)
-    self._apply_fn = jax.jit(hk.transform(_forward_fn).apply)
+    
+    if self.gc.debug:
+      print("not jitted")
+      self._init_fn = (hk.transform(_forward_fn).init)
+      self._apply_fn = hk.transform(_forward_fn).apply
+    else:
+      self._init_fn = jax.jit(hk.transform(_forward_fn).init)
+      self._apply_fn = jax.jit(hk.transform(_forward_fn).apply)
     self._loss_fn = None        # has to be initialized by external call on `Trainer.initialize()`
     self._update_fn = None      # has to be initialized by external call on `Trainer.initialize()`
 
@@ -86,6 +77,7 @@ class Trainer:
     if self.gc.use_mpi:
       self.mpi_comm = kwargs['mpi_comm']
       self.mpi_rank = self.mpi_comm.Get_rank()
+      print("INFO: mpi rank {}".format(self.mpi_rank))
       self.world_size = self.mpi_comm.Get_size()
 
     # path formatters of ckpts and loss curves
@@ -111,7 +103,7 @@ class Trainer:
   def initialize(
       self,
       batch: Optional[FeatureDict] = None,
-      load_format: Optional[str] = None,
+      load_format: Optional[str] = "pkl",
       random_seed: Optional[int] = None):
     
     # create optimizer instance
@@ -132,7 +124,8 @@ class Trainer:
       else:
         random_seed = self.gc.random_seed
         rng = jax.random.PRNGKey(random_seed)    # all ranks initialized equally.
-      params = hk.data_structures.to_mutable_dict(self._init_fn(batch=batch, rng=rng))
+      params = self._init_fn(batch=batch, rng=rng)
+      params = hk.data_structures.to_mutable_dict(params)
       self.optim_state = self.optimizer.init_state(params)
     
     # define loss_fn
@@ -149,8 +142,13 @@ class Trainer:
       import mpi4jax
       from jax.tree_util import tree_flatten, tree_unflatten
       def _mpi_reduce_value(value):
+        value.block_until_ready()
+        cpu = jax.devices('cpu')[0]
+        device = value.device()
+        value = jax.device_put(value, cpu)
         value, _ = mpi4jax.allreduce(value, op=MPI.SUM, comm=self.mpi_comm)
         value /= self.world_size
+        value = jax.device_put(value, device)
         return value
       def _mpi_reduce_tree(tree):
         flat_tree, tree_struct = tree_flatten(tree)
@@ -158,17 +156,9 @@ class Trainer:
           flat_tree[i] = _mpi_reduce_value(val)
         tree = tree_unflatten(tree_struct, flat_tree)
         return tree
-    
-    # define update_fn.  
-    def _update_fn(step, opt_state, batch, rng):
-      loss, grads = jax.value_and_grad(_loss_fn)(
-          self.optimizer.get_params(opt_state), batch, rng)
-      grads = self.optimizer.clip_grads(grads)
-      if self.gc.use_mpi:
-        loss = _mpi_reduce_value(loss)
-        grads = _mpi_reduce_tree(grads)
-      opt_state = self.optimizer.opt_update(step, grads, opt_state)
-      return opt_state, loss
+      def _hcb_reduce_tree(tree):
+        tree = hcb.call(_mpi_reduce_tree, tree, result_shape=tree)
+        return tree
     
     # define eval_fn for validation.
     def _eval_fn(params, batch, rng):
@@ -179,18 +169,31 @@ class Trainer:
     
     self._loss_fn = _loss_fn     # this is not re-jit as loss_fn is much of a wrapped apply_fn.
     self._eval_fn = _eval_fn
-    self._update_fn = jax.jit(_update_fn)   # jit transformation of update_fn.
+    if self.gc.debug:
+      self.value_and_grad = jax.value_and_grad(self._loss_fn)
+      self.opt_update = self.optimizer.opt_update
+    else:
+      self.value_and_grad = jax.jit(jax.value_and_grad(self._loss_fn))
+      self.opt_update = jax.jit(self.optimizer.opt_update)
+    # define update_fn.  
+    def _update_fn(step, opt_state, batch, rng):
+      loss, grads = self.value_and_grad(self.optimizer.get_params(opt_state), batch, rng)
+      grads = self.optimizer.clip_grads(grads)
+      if self.gc.use_mpi:
+        loss = _mpi_reduce_value(loss)
+        grads = _mpi_reduce_tree(grads)
+      opt_state = self.opt_update(step, grads, opt_state)
+      return opt_state, loss
     
+    self._update_fn = _update_fn   # jit transformation of update_fn.
     # start ticking after initialization.
     self._tic = time.time()
   
 
-  def autosave(self, step):
-    # save ckpt in both npz and pkl formats.
-    save_path_npz = os.path.join(self.gc.save_dir, self.auto_ckpt_name(step + 1, 'npz'))
-    self.optimizer.save(self.optim_state, save_path_npz)
-    save_path_pkl = os.path.join(self.gc.save_dir, self.auto_ckpt_name(step + 1, 'pkl'))
-    self.optimizer.save(self.optim_state, save_path_pkl)
+  def autosave(self, step, format='pkl'):
+    # save ckpt
+    save_path = os.path.join(self.gc.save_dir, self.auto_ckpt_name(step + 1, format))
+    self.optimizer.save(self.optim_state, save_path)
     # save loss curve
     train_curve_path = os.path.join(self.gc.save_dir, self.auto_curve_name(is_train=True))
     eval_curve_path = os.path.join(self.gc.save_dir, self.auto_curve_name(is_train=False))
@@ -241,7 +244,7 @@ class Trainer:
       if self.is_logging_step(step):
         self._logging(step, loss)
       if self.is_save_step(step):
-        self.autosave(step)
+        self.autosave(step, format='pkl')
 
 
   def eval_step(self, step, batch, rng, silent=True):

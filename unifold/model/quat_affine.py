@@ -1,4 +1,4 @@
-# Copyright 2021 Beijing DP Technology Co., Ltd.
+# Copyright 2021 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.experimental import host_callback as hcb
 
 # pylint: disable=bad-whitespace
 QUAT_TO_ROT = np.zeros((4, 4, 3, 3), dtype=np.float32)
@@ -79,6 +80,37 @@ QUAT_MULTIPLY[:, :, 3] = [[ 0, 0, 0, 1],
 QUAT_MULTIPLY_BY_VEC = QUAT_MULTIPLY[:, 1:, :]
 # pylint: enable=bad-whitespace
 
+def myEigen(x):
+  print("eigen solver is dummy")
+  # input [len, 4, 4] output [len, 4]
+  # should return the eigenvector of the largest eigenvalue
+  return x[:,:,0]
+  
+def foo(x: np.ndarray) -> np.ndarray:
+  tmp = np.linalg.eigh(x)[1].astype(x.dtype)[..., -1]
+  if len(tmp.shape)==3 and tmp.shape[0]==1: # batching transformation
+    tmp = tmp[0]
+  return tmp
+# the eigenvector of the largest eigenvalue
+
+def bar(x: np.ndarray) -> np.ndarray:
+  return x + 1
+  
+from jax.interpreters import batching
+from jax import core
+import pdb
+from jax.experimental.host_callback import _add_transform, outside_call_p
+
+def _outside_call_batching_rule(batched_args, batch_dims, **params):
+ # if not params["identity"]:
+  #  raise NotImplementedError("batching rules are implemented only for id_tap, not for call.")
+  assert "has_token" not in params
+  new_params = _add_transform(params, "batch", batch_dims)
+  res = outside_call_p.bind(*batched_args, **new_params)
+  return res, batch_dims
+keys = [key for key in batching.primitive_batchers.keys()]
+# outside_call_p
+batching.primitive_batchers[keys[-1]] = _outside_call_batching_rule
 
 def rot_to_quat(rot, unstack_inputs=False):
   """Convert rotation matrix to quaternion.
@@ -108,10 +140,17 @@ def rot_to_quat(rot, unstack_inputs=False):
 
   k = (1./3.) * jnp.stack([jnp.stack(x, axis=-1) for x in k],
                           axis=-2)
-
   # Get eigenvalues in non-decreasing order and associated.
-  qs = jnp.linalg.eigh(k.astype(jnp.float32))[1].astype(k.dtype)
-  return qs[..., -1]
+  #qs = myEigen(k)
+  
+  #result_shape = jax.ShapeDtypeStruct(k.shape[:-1], np.float32)
+  #qs = hcb.call(foo, k.astype(jnp.float32), result_shape=result_shape)
+  # input [len, 4, 4] output [len, 4]
+  
+  qs = foo(k)
+  
+  #qs = jnp.linalg.eigh(k.astype(jnp.float32))[1].astype(k.dtype)[..., -1]
+  return qs 
 
 
 def rot_list_to_tensor(rot_list):
